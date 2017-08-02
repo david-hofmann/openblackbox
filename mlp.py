@@ -6,12 +6,22 @@ from __future__ import print_function
 import numpy as np
 #np.random.seed(1337)  # for reproducibility
 
+import keras
 from keras.datasets import mnist
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import np_utils
 from time import time
+import matplotlib.pyplot as plt
+
+class PlotWeights(keras.callbacks.Callback):
+    def on_batch_end(self, batch, logs={}):
+        w = self.model.get_weights()
+        plt.plot(batch, w[0][0, 0], 'b.')
+
+    def on_train_end(self, logs={}):
+        plt.savefig("test.eps")
 
 
 def MI_XT(X, T):
@@ -22,12 +32,13 @@ def MI_XT(X, T):
   nwords = X.shape
   return 12 - len(X)^-1 * np.log2(nwords)
 
-batch_size = 256
+
+batch_size = 128
 nb_classes = 2
-nb_epoch = 1000
+nb_epoch = 1
 
 # the data, shuffled and split between train and test sets
-data = np.loadtxt('data9.dat', dtype='int')
+data = np.loadtxt('data8.dat', dtype='int')
 N = data.shape[0]
 print(data.shape)
 idx = np.arange(0, data.shape[0])
@@ -67,16 +78,17 @@ model.add(Activation('softmax'))
 model.summary()
 
 model.compile(loss='categorical_crossentropy',
-              optimizer=SGD(lr=0.1, momentum=0.93),
-              metrics=['accuracy'])
+              optimizer=SGD(lr=0.1, momentum=0.93))
+#              metrics=['accuracy'])
+
+plotweights = PlotWeights()
 
 history = model.fit(X_train, Y_train,
                     batch_size=batch_size, nb_epoch=nb_epoch,
-                    verbose=0)
+                    verbose=0, callbacks=[plotweights])
 
-model.fit(
 
 score = model.evaluate(X_test, Y_test, verbose=0)
-print('Test score:', score[0])
-print('Test accuracy:', score[1])
+#print('Test score:', score[0])
+#print('Test accuracy:', score[1])
 print('Time spent:', time() - t0)
