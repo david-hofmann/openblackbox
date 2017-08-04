@@ -15,13 +15,81 @@ from keras.utils import np_utils
 from time import time
 import matplotlib.pyplot as plt
 
+
 class PlotWeights(keras.callbacks.Callback):
+    color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+                      '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+                      '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+                      '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
+
+    def __init__(self):
+        self.iteration = 0
+
     def on_batch_end(self, batch, logs={}):
-        w = self.model.get_weights()
-        plt.plot(batch, w[0][0, 0], 'b.')
+        self.iteration += 1
+        for layer in range(7):
+            w = self.model.get_weights()[layer*2]
+            nconnections = w.shape[0]
+            for unit in range(w.shape[1]):
+                self.axes[layer][unit].scatter([self.iteration]*nconnections, w[:, unit], \
+                                               color=PlotWeights.color_sequence[:nconnections])
+
+    def on_train_begin(self, logs={}):
+        self.axes = []
+        configuration = self.model.get_config()
+        for layer in range(7):
+            nunits = configuration["layers"][layer*2]["output_dim"]
+            rows = int(np.ceil(nunits/3))
+            self.axes.append(plt.subplots(rows, 3)[1].flatten())
 
     def on_train_end(self, logs={}):
-        plt.savefig("test.eps")
+        for layer in range(7):
+            plt.figure(layer)
+            plt.title("layer " + str(layer+1))
+            plt.savefig("test_layer" + str(layer+1) + ".eps")
+
+class AnalyzeWeights(keras.callbacks.Callback):
+    color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+                      '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+                      '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+                      '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
+
+    def __init__(self):
+        #TODO: instead of append to w do reserve needed memory space ahead!!!
+        self.w = [None]*7
+        self.firstbatch = True
+
+    def on_batch_end(self, batch, logs={}):
+        if self.firstbatch:
+            self.firstbatch = False
+            for layer in range(7):
+                self.w[layer] = np.asarray([self.model.get_weights()[layer*2],])
+        else:
+            for layer in range(7):
+                self.w[layer] = np.concatenate((self.w[layer], [self.model.get_weights()[layer*2]]), axis=0)
+
+
+    def on_train_begin(self, logs={}):
+        self.axes = []
+        self.figures = []
+        configuration = self.model.get_config()
+        for layer in range(7):
+            nunits = configuration["layers"][layer*2]["output_dim"]
+            rows = int(np.ceil(nunits/3))
+            f, a = plt.subplots(rows, 3,sharex=True)
+            self.axes.append(a.flatten())
+            self.figures.append(f)
+
+    def on_train_end(self, logs={}):
+        for layer in range(7):
+            for unit in range(self.w[layer].shape[2]):
+                for link in range(self.w[layer].shape[1]):
+                    self.axes[layer][unit].plot(self.w[layer][:, link, unit], \
+                                                color=AnalyzeWeights.color_sequence[link])
+                    self.axes[layer][unit].xaxis.set_ticks(np.linspace(0, self.w[0].shape[0], 3))
+            self.figures[layer].set_dpi = 300
+            self.figures[layer].set_size_inches(12,9)
+            self.figures[layer].savefig("layer" + str(layer+1) + ".jpg")
 
 
 def MI_XT(X, T):
@@ -33,12 +101,12 @@ def MI_XT(X, T):
   return 12 - len(X)^-1 * np.log2(nwords)
 
 
-batch_size = 128
+batch_size = 256
 nb_classes = 2
-nb_epoch = 1
+nb_epoch = 1000
 
 # the data, shuffled and split between train and test sets
-data = np.loadtxt('data8.dat', dtype='int')
+data = np.loadtxt('data9.dat', dtype='int')
 N = data.shape[0]
 print(data.shape)
 idx = np.arange(0, data.shape[0])
@@ -81,7 +149,7 @@ model.compile(loss='categorical_crossentropy',
               optimizer=SGD(lr=0.1, momentum=0.93))
 #              metrics=['accuracy'])
 
-plotweights = PlotWeights()
+plotweights = AnalyzeWeights()
 
 history = model.fit(X_train, Y_train,
                     batch_size=batch_size, nb_epoch=nb_epoch,
