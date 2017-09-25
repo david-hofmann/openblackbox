@@ -16,38 +16,6 @@ from time import time
 import matplotlib.pyplot as plt
 
 
-class PlotWeights(keras.callbacks.Callback):
-    color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                      '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                      '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                      '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
-
-    def __init__(self):
-        self.iteration = 0
-
-    def on_batch_end(self, batch, logs={}):
-        self.iteration += 1
-        for layer in range(7):
-            w = self.model.get_weights()[layer*2]
-            nconnections = w.shape[0]
-            for unit in range(w.shape[1]):
-                self.axes[layer][unit].scatter([self.iteration]*nconnections, w[:, unit], \
-                                               color=PlotWeights.color_sequence[:nconnections])
-
-    def on_train_begin(self, logs={}):
-        self.axes = []
-        configuration = self.model.get_config()
-        for layer in range(7):
-            nunits = configuration["layers"][layer*2]["output_dim"]
-            rows = int(np.ceil(nunits/3))
-            self.axes.append(plt.subplots(rows, 3)[1].flatten())
-
-    def on_train_end(self, logs={}):
-        for layer in range(7):
-            plt.figure(layer)
-            plt.title("layer " + str(layer+1))
-            plt.savefig("test_layer" + str(layer+1) + ".eps")
-
 class AnalyzeWeights(keras.callbacks.Callback):
     color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
                       '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
@@ -157,6 +125,6 @@ history = model.fit(X_train, Y_train,
 
 
 score = model.evaluate(X_test, Y_test, verbose=0)
-#print('Test score:', score[0])
+print('Test score:', score)
 #print('Test accuracy:', score[1])
 print('Time spent:', time() - t0)
