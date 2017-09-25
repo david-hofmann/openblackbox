@@ -16,37 +16,37 @@ from time import time
 import matplotlib.pyplot as plt
 
 
-class PlotWeights(keras.callbacks.Callback):
-    color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                      '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                      '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                      '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
-
-    def __init__(self):
-        self.iteration = 0
-
-    def on_batch_end(self, batch, logs={}):
-        self.iteration += 1
-        for layer in range(7):
-            w = self.model.get_weights()[layer*2]
-            nconnections = w.shape[0]
-            for unit in range(w.shape[1]):
-                self.axes[layer][unit].scatter([self.iteration]*nconnections, w[:, unit], \
-                                               color=PlotWeights.color_sequence[:nconnections])
-
-    def on_train_begin(self, logs={}):
-        self.axes = []
-        configuration = self.model.get_config()
-        for layer in range(7):
-            nunits = configuration["layers"][layer*2]["output_dim"]
-            rows = int(np.ceil(nunits/3))
-            self.axes.append(plt.subplots(rows, 3)[1].flatten())
-
-    def on_train_end(self, logs={}):
-        for layer in range(7):
-            plt.figure(layer)
-            plt.title("layer " + str(layer+1))
-            plt.savefig("test_layer" + str(layer+1) + ".eps")
+# class PlotWeights(keras.callbacks.Callback):
+#     color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
+#                       '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
+#                       '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
+#                       '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
+# 
+#     def __init__(self):
+#         self.iteration = 0
+# 
+#     def on_batch_end(self, batch, logs={}):
+#         self.iteration += 1
+#         for layer in range(7):
+#             w = self.model.get_weights()[layer*2]
+#             nconnections = w.shape[0]
+#             for unit in range(w.shape[1]):
+#                 self.axes[layer][unit].scatter([self.iteration]*nconnections, w[:, unit], \
+#                                                color=PlotWeights.color_sequence[:nconnections])
+# 
+#     def on_train_begin(self, logs={}):
+#         self.axes = []
+#         configuration = self.model.get_config()
+#         for layer in range(7):
+#             nunits = configuration["layers"][layer*2]["output_dim"]
+#             rows = int(np.ceil(nunits/3))
+#             self.axes.append(plt.subplots(rows, 3)[1].flatten())
+# 
+#     def on_train_end(self, logs={}):
+#         for layer in range(7):
+#             plt.figure(layer)
+#             plt.title("layer " + str(layer+1))
+#             plt.savefig("test_layer" + str(layer+1) + ".eps")
 
 class AnalyzeWeights(keras.callbacks.Callback):
     color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
@@ -58,6 +58,7 @@ class AnalyzeWeights(keras.callbacks.Callback):
         #TODO: instead of append to w do reserve needed memory space ahead!!!
         self.w = [None]*7
         self.firstbatch = True
+#        self.plot = True
 
     def on_batch_end(self, batch, logs={}):
         if self.firstbatch:
@@ -73,23 +74,27 @@ class AnalyzeWeights(keras.callbacks.Callback):
         self.axes = []
         self.figures = []
         configuration = self.model.get_config()
-        for layer in range(7):
-            nunits = configuration["layers"][layer*2]["output_dim"]
-            rows = int(np.ceil(nunits/3))
-            f, a = plt.subplots(rows, 3,sharex=True)
-            self.axes.append(a.flatten())
-            self.figures.append(f)
+        if self.plot:
+            for layer in range(7):
+                nunits = configuration["layers"][layer*2]["output_dim"]
+                rows = int(np.ceil(nunits/3))
+                f, a = plt.subplots(rows, 3,sharex=True)
+                self.axes.append(a.flatten())
+                self.figures.append(f)
 
-    def on_train_end(self, logs={}):
-        for layer in range(7):
-            for unit in range(self.w[layer].shape[2]):
-                for link in range(self.w[layer].shape[1]):
-                    self.axes[layer][unit].plot(self.w[layer][:, link, unit], \
-                                                color=AnalyzeWeights.color_sequence[link])
-                    self.axes[layer][unit].xaxis.set_ticks(np.linspace(0, self.w[0].shape[0], 3))
-            self.figures[layer].set_dpi = 300
-            self.figures[layer].set_size_inches(12,9)
-            self.figures[layer].savefig("layer" + str(layer+1) + ".jpg")
+#    def on_train_end(self, logs={}):
+#        for layer in range(7):
+#            for unit in range(self.w[layer].shape[2]):
+#                for link in range(self.w[layer].shape[1]):
+#                    self.autocorr[layer, unit, link, :] = np.correlate(self.w[layer][:, link, unit], self.w[layer][:, link, unit], mode='full')
+#                    if self.plot:
+#                        self.axes[layer][unit].plot(self.w[layer][:, link, unit], \
+#                                                    color=AnalyzeWeights.color_sequence[link])
+#                        self.axes[layer][unit].xaxis.set_ticks(np.linspace(0, self.w[0].shape[0], 3))
+#            if self.plot:
+#                self.figures[layer].set_dpi = 300
+#                self.figures[layer].set_size_inches(12,9)
+#                self.figures[layer].savefig("layer" + str(layer+1) + ".jpg")
 
 
 def MI_XT(X, T):
@@ -149,12 +154,27 @@ model.compile(loss='categorical_crossentropy',
               optimizer=SGD(lr=0.1, momentum=0.93))
 #              metrics=['accuracy'])
 
-plotweights = AnalyzeWeights()
+analyzeweights = AnalyzeWeights()
 
 history = model.fit(X_train, Y_train,
                     batch_size=batch_size, nb_epoch=nb_epoch,
-                    verbose=0, callbacks=[plotweights])
+                    verbose=0, callbacks=[analyzeweights])
 
+for layer in range(7):
+    for unit in range(analyzeweights.w[layer].shape[2]):
+        for link in range(analyzeweights.w[layer].shape[1]):
+            tmp_w = analyzeweights.w[layer][:, link, unit],
+            autocorr[layer, unit, link, :] = np.correlate(tmp_w, tmp_w, mode='full')
+            if analyzeweights.plot:
+                analyzeweights.axes[layer][unit].plot(analyzeweights.w[layer][:, link, unit], \
+                                                      color=AnalyzeWeights.color_sequence[link])
+                analyzeweights.axes[layer][unit].xaxis.set_ticks(np.linspace(0, analyzeweights.w[0].shape[0], 3))
+    if analyzeweights.plot:
+        analyzeweights.figures[layer].set_dpi = 300
+        analyzeweights.figures[layer].set_size_inches(12,9)
+        analyzeweights.figures[layer].savefig("layer" + str(layer+1) + ".jpg")
+
+autocorr
 
 score = model.evaluate(X_test, Y_test, verbose=0)
 #print('Test score:', score[0])
