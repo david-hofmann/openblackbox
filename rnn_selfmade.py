@@ -113,11 +113,10 @@ class RNNNumpy:
     #         print("Gradient check for parameter %s passed." % (pname))
 
 
-def gendata(T=7, num=1000):
-    x = np.random.rand((T, num))
-    # idx = np.random.choice(T, (2, num), replace=False)
-    y = np.zeros(T, num)
+def gendata(T=7, num=10):
+    x = np.random.rand(num, T)
+    y = np.zeros((num, T))
     for i in range(num):
-        y[:, i] = np.random.randint(T, size=T)
+        y[i, np.random.randint(T, size=2)] = 1
 
-    return (x, y)
+    return [x, np.sum(np.multiply(x, y), axis=1)]
