@@ -1,11 +1,13 @@
 #/usr/bin/python
 
 import numpy as np
+from time import time
 
+np.random.seed(0)
 
 class RNNNumpy:
 
-    def __init__(self, timesteps, in_dim, out_dim, batch_size = 10, hidden_dim=100, learningrate=0.01, gradclipthreshold=1):
+    def __init__(self, timesteps, in_dim, out_dim, batch_size = 10, hidden_dim=100, learningrate=0.001, gradclipthreshold=1):
         # Assign instance variables
         """
 
@@ -65,8 +67,9 @@ class RNNNumpy:
             # Update delta for next step dL/dz at t-1
             delta_t = self.W.T.dot(tmp)
 
-        return [o, {'dU':dLdU/self.batch_size, 'dV':dLdV/self.batch_size, 'dbV':dLdbV/self.batch_size,
-                 'dW':dLdW/self.batch_size, 'dbW':dLdbW/self.batch_size}]
+        return [o, {'dU':self.grad_clip(dLdU/self.batch_size), 'dV':self.grad_clip(dLdV/self.batch_size),
+                    'dbV':self.grad_clip(dLdbV/self.batch_size), 'dW':self.grad_clip(dLdW/self.batch_size),
+                    'dbW':self.grad_clip(dLdbW/self.batch_size)}]
 
     def grad_clip(self, g):
         if np.linalg.norm(g) > self.thresh:
@@ -95,7 +98,7 @@ class RNNNumpy:
             s[t] = np.dot(U,x[t]) + np.dot(W,s[t-1]) + bW
             s[t] = self.rectify(s[t])
 
-        o = self.rectify(np.dot(V,s[-2]) + bV)
+        o = self.rectify(np.dot(V,s[-1]) + bV)
         return [o, s]
 
     # def gradient_check(self, x, y, grads, epsilon):
@@ -200,18 +203,21 @@ def gendata(num=10, T=7):
         x[np.random.randint(T, size=2), 1, i] = 1
     return [x, np.sum(np.multiply(x[:, 0, :], x[:, 1, :]), axis=0, keepdims=True)]
 
-
-inp, outp = gendata(100, 7)
-batch_size = 10
+t_start = time()
+inp, outp = gendata(100000, 10)
+batch_size = 100
 epochs = 20
 
-rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size)
+rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size, gradclipthreshold=100)
 
 for n in range(epochs):
+    print("epoch: %i" %n)
     for i in range(int(inp.shape[2] / batch_size)):
         tmp_x = inp[:, :, i*batch_size:(i+1)*batch_size]
         tmp_y = outp[:, i*batch_size:(i+1)*batch_size]
         o, grad = rnn.bptt(tmp_x, tmp_y)
         rnn.update_weights(grad)
-        loss = rnn.calculate_mse(o, tmp_y)
-        print("Loss is: %f" %loss)
+    loss = rnn.calculate_mse(o, tmp_y)
+    print("Loss is: %f" % loss)
+
+print("elapsed time: %f" % (time() - t_start))
