@@ -3,7 +3,7 @@
 import numpy as np
 from time import time
 
-np.random.seed(0)
+np.random.seed(2)
 
 class RNNNumpy:
 
@@ -25,7 +25,10 @@ class RNNNumpy:
         self.V = np.random.uniform(-np.sqrt( 1. / hidden_dim), np.sqrt( 1. / hidden_dim), (out_dim, hidden_dim))
         self.bV = np.zeros((out_dim, 1))
         self.W = np.eye(hidden_dim)
-        self.B = np.eye(hidden_dim) + np.diag(np.random.rand(hidden_dim)-0.5)
+        # self.B = [None]*timesteps
+        # for i in range(timesteps):
+        #     self.B[i] = np.eye(hidden_dim) + 0.1*np.diag(np.random.randn(hidden_dim))
+        self.B = np.eye(hidden_dim) + 0.1*np.diag(np.random.randn(hidden_dim))
         self.bW = np.zeros((hidden_dim, 1))
 
     def forward_propagation(self, x):
@@ -234,7 +237,7 @@ def gendata(num=10, T=7):
 t_start = time()
 inp, outp = gendata(1000, 10)
 batch_size = 100
-epochs = 40
+epochs = 100
 
 rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size, gradclipthreshold=100)
 

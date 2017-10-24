@@ -28,11 +28,13 @@ class AnalyzeWeights(keras.callbacks.Callback):
                       '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
                       '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
 
-    def __init__(self, layers, inputdim, niterations, act, data):
+    def __init__(self, layers, inputdim, niterations, act_functor, data):
+        super(AnalyzeWeights, self).__init__()
         self.nlayers = len(layers)
         self.data = data
-        self.activations = act
+        self.act_func = act_functor
         self.w = []
+        self.MI = []
         self.iter = 0
         self.nlinksperunit = [None]*7
         for i in range(self.nlayers):
@@ -47,47 +49,48 @@ class AnalyzeWeights(keras.callbacks.Callback):
     def on_batch_end(self, batch, logs={}):
         for layer in range(self.nlayers):
             self.w[layer][self.iter, :, :] = np.asarray([self.model.get_weights()[layer * 2], ])
-            if self.iter % 100 == 0:
-
-
+            if self.iter % 10 == 0:
+                activations = self.act_func([self.data[:, :-1]])
+                activations = [np.digitize(a, np.linspace(-1, 1, 30)) for a in activations[:-1]]
+                self.MI.append([self.MI_layerwise(data[:, -1], T) for T in activations])
         self.iter += 1
 
 
-def coocurrences(data):
-    dt = np.dtype((np.void, data.dtype.itemsize * data.shape[1]))
-    tmp = np.ascontiguousarray(data).view(dt)
-    unq, cnt = np.unique(tmp, return_counts=True)
-    unq = unq.view(data.dtype).reshape(-1, data.shape[1])
-    return dict(zip(tuple(map(tuple, unq)), cnt))
+    def coocurrences(self, data):
+        dt = np.dtype((np.void, data.dtype.itemsize * data.shape[1]))
+        tmp = np.ascontiguousarray(data).view(dt)
+        unq, cnt = np.unique(tmp, return_counts=True)
+        unq = unq.view(data.dtype).reshape(-1, data.shape[1])
+        return dict(zip(tuple(map(tuple, unq)), cnt))
 
 
-def MI_layerwise(X, act):
-    # X: label vector
-    # act: layer output matrix (activations)
-    # count words of length N-units, how often do they occur...
-    N = len(X)
-    MI_XT = 12
-    NT  = coocurrences(act)
-    counts = np.asarray(list(NT.values()))
-    idx = counts > 1  # log(1) = 0 so remove them, they are many and make for loop slow
-    for nT in counts[idx]:
-        MI_XT += -N**-1 * nT * np.log2(nT)
+    def MI_layerwise(self, X, act):
+        # X: label vector
+        # act: layer output matrix (activations)
+        # count words of length N-units, how often do they occur...
+        N = len(X)
+        MI_XT = 12
+        NT  = self.coocurrences(act)
+        counts = np.asarray(list(NT.values()))
+        idx = counts > 1  # log(1) = 0 so remove them, they are many and make for loop slow
+        for nT in counts[idx]:
+            MI_XT += -N**-1 * nT * np.log2(nT)
 
-    MI_TY = 1
-    tmp = act[X.astype(bool), :]
-    for (T, nT) in coocurrences(tmp).items():
-        MI_TY += N**-1 * nT * np.log2(nT/NT[T])
-    for (T, nT) in coocurrences(act[np.invert(X.astype(bool)), :]).items():
-        MI_TY += N**-1 * nT * np.log2(nT/NT[T])
+        MI_TY = 1
+        tmp = act[X.astype(bool), :]
+        for (T, nT) in self.coocurrences(tmp).items():
+            MI_TY += N**-1 * nT * np.log2(nT/NT[T])
+        for (T, nT) in self.coocurrences(act[np.invert(X.astype(bool)), :]).items():
+            MI_TY += N**-1 * nT * np.log2(nT/NT[T])
 
-    return (MI_XT, MI_TY)
+        return (MI_XT, MI_TY)
 
 
 
 batch_size = 128
 nb_classes = 2
 nb_epoch = 1000
-saveplots = True
+saveplots = False
 trainingbatch = 0.85
 
 # the data, shuffled and split between train and test sets
@@ -133,26 +136,34 @@ model.summary()
 model.compile(loss='categorical_crossentropy',
               optimizer=SGD(lr=0.1, momentum=0.93), metrics=['accuracy'])
 
-analyzeweights = AnalyzeWeights(unitsperlayer, inputdim, niterations)
+# to compute information plane prepare activation functor
+inp = model.input                                          # input placeholder
+outputs = [layer.output for layer in model.layers if layer.name[:layer.name.index('_')] == 'activation']  # all layer outputs
+functor = K.function([inp], outputs)                       # evaluation function
+
+analyzeweights = AnalyzeWeights(unitsperlayer, inputdim, niterations, data=data, act_functor=functor)
 
 history = model.fit(X_train, Y_train,
                     batch_size=batch_size, epochs=nb_epoch,
                     verbose=0, callbacks=[analyzeweights])
 
 t1 = time()
-# compute information plane
-inp = model.input                                           # input placeholder
-outputs = [layer.output for layer in model.layers if layer.name[:layer.name.index('_')] == 'activation']  # all layer outputs
-functor = K.function([inp], outputs )                       # evaluation function
+# # compute information plane
+# inp = model.input                                           # input placeholder
+# outputs = [layer.output for layer in model.layers if layer.name[:layer.name.index('_')] == 'activation']  # all layer outputs
+# functor = K.function([inp], outputs )                       # evaluation function
 
-activations = functor([data[:, :-1]])
-activations = [np.digitize(a, np.linspace(-1, 1, 30)) for a in activations[:-1]]
-MI = [MI_layerwise(data[:, -1], T) for T in activations]
+# activations = functor([data[:, :-1]])
+# activations = [np.digitize(a, np.linspace(-1, 1, 30)) for a in activations[:-1]]
+# MI = [MI_layerwise(data[:, -1], T) for T in activations]
+
 plt.figure()
-for layer in range(len(MI)):
-    plt.scatter(MI[layer][0], MI[layer][1], c=AnalyzeWeights.color_sequence[layer])
+for MI in analyzeweights.MI:
+    for layer in range(len(MI)):
+        plt.scatter(MI[layer][0], MI[layer][1], c=AnalyzeWeights.color_sequence[layer])
 
 plt.savefig("IB plot.eps")
+
 t2 = time()
 axes = []
 autocorr = [None]*nlayers
