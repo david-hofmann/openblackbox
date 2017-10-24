@@ -25,6 +25,7 @@ class RNNNumpy:
         self.V = np.random.uniform(-np.sqrt( 1. / hidden_dim), np.sqrt( 1. / hidden_dim), (out_dim, hidden_dim))
         self.bV = np.zeros((out_dim, 1))
         self.W = np.eye(hidden_dim)
+        self.B = np.eye(hidden_dim) + np.diag(np.random.rand(hidden_dim)-0.5)
         self.bW = np.zeros((hidden_dim, 1))
 
     def forward_propagation(self, x):
@@ -44,6 +45,33 @@ class RNNNumpy:
     def predict(self, x):
         o = self.forward_propagation(x)[0]
         return self.rectify(o)
+
+    def fatt(self, x, y):
+        # Perform forward propagation
+        o, s = self.forward_propagation(x)
+        # We accumulate the gradients in these variables
+        delta_o = np.multiply(o - y, np.sign(o))
+        dLdV = np.dot(delta_o, s[-1].T)
+        dLdbV = np.sum(delta_o, axis=1, keepdims=True)
+        # Initial delta calculation: dL/dz
+        # Backpropagation through time (for at most self.bptt_truncate steps)
+        dLdU = np.zeros(self.U.shape)
+        dLdW = np.zeros(self.W.shape)
+        dLdbW = np.zeros(self.bW.shape)
+        delta_t = self.V.T.dot(delta_o)
+        for bptt_step in np.arange(self.T):
+            # Add to gradients at each previous step
+            tmp = np.multiply(delta_t, np.sign(s[-bptt_step - 1]))
+            dLdW += np.dot(tmp, s[-bptt_step - 2].T)
+            dLdbW += np.sum(tmp, axis=1, keepdims=True)
+            dLdU += np.dot(tmp, x[-bptt_step - 1].T)
+            # Update delta for next step dL/dz at t-1
+            delta_t = self.B.T.dot(tmp)
+
+        return [o, {'dU':dLdU/self.batch_size, 'dV':dLdV/self.batch_size,
+                    'dbV':dLdbV/self.batch_size, 'dW':dLdW/self.batch_size,
+                    'dbW':dLdbW/self.batch_size}]
+
 
     def bptt(self, x, y):
         # Perform forward propagation
@@ -204,9 +232,9 @@ def gendata(num=10, T=7):
     return [x, np.sum(np.multiply(x[:, 0, :], x[:, 1, :]), axis=0, keepdims=True)]
 
 t_start = time()
-inp, outp = gendata(100000, 10)
+inp, outp = gendata(1000, 10)
 batch_size = 100
-epochs = 20
+epochs = 40
 
 rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size, gradclipthreshold=100)
 
@@ -215,7 +243,7 @@ for n in range(epochs):
     for i in range(int(inp.shape[2] / batch_size)):
         tmp_x = inp[:, :, i*batch_size:(i+1)*batch_size]
         tmp_y = outp[:, i*batch_size:(i+1)*batch_size]
-        o, grad = rnn.bptt(tmp_x, tmp_y)
+        o, grad = rnn.fatt(tmp_x, tmp_y)
         rnn.update_weights(grad)
     loss = rnn.calculate_mse(o, tmp_y)
     print("Loss is: %f" % loss)
