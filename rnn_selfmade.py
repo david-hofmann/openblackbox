@@ -3,14 +3,13 @@
 import numpy as np
 from time import time
 
-np.random.seed(2)
+# np.random.seed(100)
 
 class RNNNumpy:
 
-    def __init__(self, timesteps, in_dim, out_dim, batch_size = 10, hidden_dim=100, learningrate=0.001, gradclipthreshold=1):
+    def __init__(self, timesteps, in_dim, out_dim, batch_size = 10, hidden_dim=10, learningrate=0.001, gradclipthreshold=1):
         # Assign instance variables
         """
-
         :rtype: object
         """
         self.T = timesteps
@@ -21,14 +20,14 @@ class RNNNumpy:
         self.lr = learningrate
         self.thresh = gradclipthreshold
         # Initialize the network parameters
-        self.U = np.random.uniform(-np.sqrt( 1. / in_dim), np.sqrt( 1. / in_dim), (hidden_dim, in_dim))
-        self.V = np.random.uniform(-np.sqrt( 1. / hidden_dim), np.sqrt( 1. / hidden_dim), (out_dim, hidden_dim))
-        self.bV = np.zeros((out_dim, 1))
+        self.U = 0.001 * np.random.randn(hidden_dim, in_dim) #np.sqrt( 1. / in_dim) * (np.random.randn(hidden_dim, in_dim) - 0.5)*2
+        self.V = 0.001 * np.random.randn(out_dim, hidden_dim) #np.sqrt( 1. / out_dim) * (np.random.randn(out_dim, hidden_dim) - 0.5)*2
+        self.bV = np.ones((out_dim, 1))*0.0001
         self.W = np.eye(hidden_dim)
         # self.B = [None]*timesteps
         # for i in range(timesteps):
         #     self.B[i] = np.eye(hidden_dim) + 0.1*np.diag(np.random.randn(hidden_dim))
-        self.B = np.eye(hidden_dim) + 0.1*np.diag(np.random.randn(hidden_dim))
+        self.B = np.eye(hidden_dim) + np.diag(np.random.rand(hidden_dim) - 0.5)
         self.bW = np.zeros((hidden_dim, 1))
 
     def forward_propagation(self, x):
@@ -111,11 +110,11 @@ class RNNNumpy:
         return 0.5 * np.sum(np.power(o - y, 2)) / o.shape[1]
 
     def update_weights(self, grads):
-        self.U = self.U - self.lr*grads['dU']
-        self.W = self.W - self.lr*grads['dW']
-        self.bW = self.bW - self.lr*grads['dbW']
-        self.V = self.V - self.lr*grads['dV']
-        self.bV = self.bV - self.lr*grads['dbV']
+        self.U -= self.lr*grads['dU']
+        self.W -= self.lr*grads['dW']
+        self.bW -= self.lr*grads['dbW']
+        self.V -= self.lr*grads['dV']
+        self.bV -= self.lr*grads['dbV']
 
     def forward_propagation_general(self, U, V, W, bV, bW, x):
         # The total number of time steps
@@ -236,8 +235,12 @@ def gendata(num=10, T=7):
 
 t_start = time()
 inp, outp = gendata(1000, 10)
-batch_size = 100
-epochs = 100
+# with open("input.csv", "wb") as f:
+#     np.savetxt(f, inp, delimiter=',')
+# with open("output.csv", "wb") as f:
+#     np.savetxt(f, outp, delimiter=',', fmt='%.5f')
+batch_size = 1000
+epochs = 5
 
 rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size, gradclipthreshold=100)
 
@@ -246,7 +249,7 @@ for n in range(epochs):
     for i in range(int(inp.shape[2] / batch_size)):
         tmp_x = inp[:, :, i*batch_size:(i+1)*batch_size]
         tmp_y = outp[:, i*batch_size:(i+1)*batch_size]
-        o, grad = rnn.fatt(tmp_x, tmp_y)
+        o, grad = rnn.bptt(tmp_x, tmp_y)
         rnn.update_weights(grad)
     loss = rnn.calculate_mse(o, tmp_y)
     print("Loss is: %f" % loss)
