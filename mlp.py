@@ -58,7 +58,7 @@ class AnalyzeWeights(keras.callbacks.Callback):
         #TODO: instead of append to w do reserve needed memory space ahead!!!
         self.w = [None]*7
         self.firstbatch = True
-#        self.plot = True
+        self.plot = True
 
     def on_batch_end(self, batch, logs={}):
         if self.firstbatch:
@@ -164,7 +164,7 @@ for layer in range(7):
     for unit in range(analyzeweights.w[layer].shape[2]):
         for link in range(analyzeweights.w[layer].shape[1]):
             tmp_w = analyzeweights.w[layer][:, link, unit],
-            autocorr[layer, unit, link, :] = np.correlate(tmp_w, tmp_w, mode='full')
+#            autocorr[layer, unit, link, :] = np.correlate(tmp_w, tmp_w, mode='full')
             if analyzeweights.plot:
                 analyzeweights.axes[layer][unit].plot(analyzeweights.w[layer][:, link, unit], \
                                                       color=AnalyzeWeights.color_sequence[link])
@@ -174,7 +174,6 @@ for layer in range(7):
         analyzeweights.figures[layer].set_size_inches(12,9)
         analyzeweights.figures[layer].savefig("layer" + str(layer+1) + ".jpg")
 
-autocorr
 
 score = model.evaluate(X_test, Y_test, verbose=0)
 #print('Test score:', score[0])
