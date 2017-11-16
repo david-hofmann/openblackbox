@@ -239,8 +239,8 @@ inp, outp = gendata(1000, 10)
 #     np.savetxt(f, inp, delimiter=',')
 # with open("output.csv", "wb") as f:
 #     np.savetxt(f, outp, delimiter=',', fmt='%.5f')
-batch_size = 1000
-epochs = 5
+batch_size = 100
+epochs = 10
 
 rnn = RNNNumpy(inp.shape[0], inp.shape[1], outp.shape[0], batch_size=batch_size, gradclipthreshold=100)
 

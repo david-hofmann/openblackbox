@@ -23,14 +23,16 @@ from keras.layers import SimpleRNN
 from keras import initializers
 from keras.optimizers import RMSprop
 import numpy as np
+import matplotlib.pyplot as plt
+plt.interactive(False)
 
-batch_size = 100
+batch_size = 16
 # num_classes = 10
 epochs = 20
 hidden_units = 100
 
-learning_rate = 1e-4
-clip_norm = 100.0
+learning_rate = 1e-3
+clip_norm = 10000.0
 
 # the data, shuffled and split between train and test sets
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -41,8 +43,8 @@ def gendata(num=10, T=7):
         x[i, np.random.randint(T, size=2), 1] = 1
     return [x, np.sum(np.multiply(x[:, :, 0], x[:, :, 1]), axis=1, keepdims=True)]
 
-x_train, y_train = gendata(1000, 10)
-x_test, y_test = gendata(100, 10)
+x_train, y_train = gendata(1000, 150)
+x_test, y_test = gendata(100, 150)
 
 # x_train = x_train.reshape(x_train.shape[0], -1, 1)
 # x_test = x_test.reshape(x_test.shape[0], -1, 1)
@@ -58,22 +60,26 @@ print('Evaluate IRNN...')
 model = Sequential()
 model.add(SimpleRNN(hidden_units,
                     kernel_initializer=initializers.RandomNormal(stddev=0.001),
-                    # bias_initializer='zeros',
+                    bias_initializer=initializers.RandomNormal(stddev=0.001),
                     recurrent_initializer=initializers.Identity(gain=1.0),
                     activation='relu',
                     input_shape=x_train.shape[1:]))
+
 model.add(Dense(1))
 model.add(Activation('relu'))
 rmsprop = RMSprop(lr=learning_rate)
 model.compile(loss='mean_squared_error',
               optimizer=rmsprop)
 
-model.fit(x_train, y_train,
+history = model.fit(x_train, y_train,
           batch_size=batch_size,
           epochs=epochs,
-          verbose=2,
+          verbose=0,
           validation_data=(x_test, y_test))
 
 scores = model.evaluate(x_test, y_test, verbose=0)
 print('IRNN test score:', scores)
 # print('IRNN test accuracy:', scores[1])
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.show()
